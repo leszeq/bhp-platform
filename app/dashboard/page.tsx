@@ -42,8 +42,18 @@ export default async function DashboardPage() {
 
       <main className="max-w-5xl mx-auto px-6 py-10 space-y-6">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-xl font-semibold mb-1 text-gray-800">Twoje Kursy</h2>
-          <p className="text-sm text-gray-500 mb-6">Wybierz kurs, aby rozpocząć szkolenie BHP.</p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-semibold mb-1 text-gray-800">Twoje Kursy</h2>
+              <p className="text-sm text-gray-500">Wybierz kurs, aby rozpocząć szkolenie BHP.</p>
+            </div>
+            <Link
+              href="/dashboard/courses/new"
+              className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium text-sm rounded-lg transition border border-indigo-100"
+            >
+              + Dodaj kurs
+            </Link>
+          </div>
 
           {courses && courses.length > 0 ? (
             <div className="space-y-3">

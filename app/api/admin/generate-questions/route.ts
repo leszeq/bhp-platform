@@ -1,0 +1,77 @@
+import { NextResponse } from 'next/server'
+import { openai } from '@/lib/openai'
+import { createClient } from '@/lib/supabase/server'
+
+const prompt = `
+Jesteś ekspertem BHP w Polsce.
+
+Wygeneruj 5 pytań testowych wielokrotnego wyboru na nowo rozpoczęty kurs.
+
+Zasady:
+- 1 poprawna odpowiedź
+- 3 błędne odpowiedzi
+- język polski
+- pełna zgodność z przepisami prawa pracy i BHP
+- brak dwuznaczności
+- pytania muszą dotyczyć podanego tematu
+
+Zwróć format JSON z kluczem "questions" będącym tablicą obiektów o strukturze:
+{
+  "questions": [
+    {
+      "question": "treść zapytania",
+      "correct_answer": "jedna poprawna odpowiedź",
+      "wrong_answers": ["pierwsza zła", "druga zła", "trzecia zła"]
+    }
+  ]
+}
+`
+
+export async function POST(req: Request) {
+  const supabase = await createClient()
+
+  // Check auth - you might want to add role check here later
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { course_id, topic } = await req.json()
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'You are a BHP expert. Always respond in valid JSON.' },
+        { role: 'user', content: `Temat: ${topic}\n\n${prompt}` },
+      ],
+    })
+
+    const content = completion.choices[0].message.content!
+    const parsed = JSON.parse(content)
+    const questions = parsed.questions || parsed
+
+    if (!Array.isArray(questions)) {
+      throw new Error('Invalid AI output format')
+    }
+
+    // Save to database as unverified questions
+    const inserts = questions.map((q: any) => ({
+      course_id,
+      question_text: q.question,
+      correct_answer: q.correct_answer,
+      wrong_answers: q.wrong_answers,
+      is_verified: false,
+      created_by: 'ai',
+    }))
+
+    const { error } = await supabase.from('question_bank').insert(inserts)
+    if (error) {
+       throw new Error(error.message)
+    }
+
+    return NextResponse.json({ ok: true, count: inserts.length })
+  } catch (error: any) {
+    console.error('AI Error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+}

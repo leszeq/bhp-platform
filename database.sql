@@ -88,3 +88,27 @@ $$ language plpgsql security definer;
 create or replace trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- PAYMENTS
+create table public.payments (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles(id),
+  course_id uuid references courses(id),
+  status text default 'pending',
+  created_at timestamp default now()
+);
+
+-- COMPANIES (B2B)
+create table public.companies (
+  id uuid primary key default gen_random_uuid(),
+  name text,
+  owner_id uuid references profiles(id),
+  created_at timestamp default now()
+);
+
+-- COMPANY USERS (B2B)
+create table public.company_users (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid references companies(id),
+  user_id uuid references profiles(id)
+);
