@@ -3,7 +3,11 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 export async function POST(req: Request) {
   const body = await req.text()
-  const sig = req.headers.get('stripe-signature')!
+  const sig = req.headers.get('stripe-signature')
+
+  console.log('--- STRIPE WEBHOOK RECEIVED ---', { sig_exists: !!sig })
+
+  if (!sig) return new Response('No signature', { status: 400 })
 
   let event
 
@@ -13,6 +17,7 @@ export async function POST(req: Request) {
       sig,
       process.env.STRIPE_WEBHOOK_SECRET!
     )
+    console.log('Webhook event constructed:', event.type)
   } catch (err: any) {
     console.error(`Webhook signature verification failed:`, err.message)
     return new Response(`Webhook error: ${err.message}`, { status: 400 })

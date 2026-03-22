@@ -112,3 +112,29 @@ create table public.company_users (
   company_id uuid references companies(id),
   user_id uuid references profiles(id)
 );
+
+-- INVITATIONS (Employee Onboarding)
+create table public.invitations (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  company_id uuid references companies(id),
+  course_id uuid references courses(id),
+  token text unique not null,
+  status text default 'pending', -- pending / accepted / expired
+  expires_at timestamp,
+  created_at timestamp default now(),
+  email_sent_at timestamp,
+  reminder_count int default 0
+);
+
+-- Rozszerzenie profili dla B2B Magic Links
+alter table public.profiles add column company_id uuid references companies(id);
+
+-- USER COURSES (B2B Employee Progress)
+create table public.user_courses (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references profiles(id),
+  course_id uuid references courses(id),
+  status text default 'not_started',
+  created_at timestamp default now()
+);

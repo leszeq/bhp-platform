@@ -47,12 +47,20 @@ export default async function DashboardPage() {
               <h2 className="text-xl font-semibold mb-1 text-gray-800">Twoje Kursy</h2>
               <p className="text-sm text-gray-500">Wybierz kurs, aby rozpocząć szkolenie BHP.</p>
             </div>
-            <Link
-              href="/dashboard/courses/new"
-              className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium text-sm rounded-lg transition border border-indigo-100"
-            >
-              + Dodaj kurs
-            </Link>
+            <div className="flex gap-3">
+              <Link
+                href="/dashboard/b2b"
+                className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-white text-gray-700 hover:bg-gray-50 font-medium text-sm rounded-lg transition border border-gray-200 shadow-sm"
+              >
+                🏢 Panel Firmowy
+              </Link>
+              <Link
+                href="/dashboard/courses/new"
+                className="mt-4 sm:mt-0 inline-flex items-center px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-medium text-sm rounded-lg transition border border-indigo-100 shadow-sm"
+              >
+                + Dodaj kurs
+              </Link>
+            </div>
           </div>
 
           {courses && courses.length > 0 ? (

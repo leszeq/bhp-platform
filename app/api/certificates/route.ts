@@ -56,6 +56,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Could not save certificate record' }, { status: 500 })
     }
     cert = newCert
+
+    // Nowe certyfikaty emitują emaila systemowego
+    try {
+      const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
+      const link = `${origin}/verify/${code}` // Punkt weryfikacji służy jako idealne miejsce docelowe
+      const { certificateEmail } = await import('@/emails/templates')
+      const { sendEmail } = await import('@/utils/sendEmail')
+
+      const emailContent = certificateEmail(link)
+      if (user.email) {
+         await sendEmail(user.email, emailContent.subject, emailContent.html)
+      }
+    } catch (e) {
+      console.error('Failed to send cert email:', e)
+    }
   }
 
   const nameToUse = user.email?.split('@')[0] || 'Uczestnik Szkolenia'
