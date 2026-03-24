@@ -49,6 +49,11 @@ export default async function B2BDashboard() {
     .eq('company_id', company.id)
     .eq('status', 'pending')
 
+  const { data: companyCourses } = await supabase
+    .from('company_courses')
+    .select('*, courses(*)')
+    .eq('company_id', company.id)
+
   console.log('[B2B] companyUsers:', companyUsers?.length)
   console.log('[B2B] pendingInvitations:', pendingInvitations?.length)
 
@@ -153,7 +158,46 @@ export default async function B2BDashboard() {
         </div>
       </div>
 
-      {/* 3. EMPLOYEE LIST & ADD MODAL */}
+      {/* 3. COMPANY COURSES */}
+      <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden mb-12">
+        <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/80 flex justify-between items-center">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Oferta Kursów</h2>
+            <p className="text-sm text-gray-500 mt-1">Szkolenia wybrane dla Twoich pracowników.</p>
+          </div>
+          <Link 
+            href="/dashboard/b2b/courses/add" 
+            className="bg-black text-white px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-gray-800 transition shadow-lg shadow-black/10"
+          >
+            + Dodaj kurs z puli
+          </Link>
+        </div>
+        
+        <div className="p-6">
+          {(!companyCourses || companyCourses.length === 0) ? (
+            <div className="text-center py-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+              <p className="text-gray-400 font-bold">Twoja firma nie ma jeszcze przypisanych kursów.</p>
+              <p className="text-xs text-gray-400 mt-1">Kliknij przycisk powyżej, aby wybrać szkolenia z katalogu.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {companyCourses.map((cc: any) => (
+                <div key={cc.id} className="p-4 border border-gray-100 rounded-2xl bg-white hover:border-indigo-100 transition shadow-sm flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl">
+                    📚
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-900 truncate">{cc.courses.title}</p>
+                    <p className="text-xs text-indigo-600 font-bold uppercase tracking-wider">Aktywny</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 4. EMPLOYEE LIST & ADD MODAL */}
       <div className="bg-white border border-gray-200 rounded-3xl shadow-sm overflow-hidden mb-12">
         <div className="px-6 py-5 border-b border-gray-100 bg-gray-50/80">
           <h2 className="text-lg font-bold text-gray-900">Zarządzanie Zespołem</h2>
@@ -161,7 +205,7 @@ export default async function B2BDashboard() {
         </div>
         
         <div className="p-6 border-b border-gray-100 bg-white">
-           <AddEmployeeModal companyId={company.id} />
+           <AddEmployeeModal companyId={company.id} companyCourses={companyCourses || []} />
         </div>
 
         <div className="divide-y divide-gray-100">

@@ -1,60 +1,61 @@
 import { createClient } from '@/lib/supabase/server'
-import { redirect } from 'next/navigation'
-import { VerifyButton } from './components/VerifyButton'
+import { AdminService } from '@/lib/services/adminService'
+import { QuestionActions } from './components/QuestionActions'
 
-export default async function AdminQuestions() {
+export default async function AdminQuestionsPage() {
   const supabase = await createClient()
-
-  // Wymaga zalogowania (docelowo należy też sprawdzić role='admin' z tabeli profiles)
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
-
-  const { data } = await supabase
-    .from('question_bank')
-    .select('*, courses(title)')
-    .eq('is_verified', false)
+  const adminService = new AdminService(supabase)
+  
+  const unverified = await adminService.getUnverifiedQuestions()
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold mb-6 text-gray-900">
-          Pytania do zatwierdzenia (Panel Admina)
-        </h1>
+    <div className="max-w-6xl mx-auto">
+      <header className="mb-10">
+        <h1 className="text-4xl font-black text-gray-900 tracking-tight">Baza Pytań AI</h1>
+        <p className="text-gray-500 mt-2 font-medium">Zweryfikuj pytania wygenerowane przez sztuczną inteligencję przed ich aktywacją.</p>
+      </header>
 
-        <div className="space-y-4">
-          {data && data.length > 0 ? (
-            data.map((q) => (
-              <div key={q.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
-                <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-md mb-3 inline-block">
-                  Kurs: {q.courses?.title || q.course_id}
-                </span>
-                <p className="font-semibold text-gray-900 text-lg mb-4">{q.question_text}</p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div className="bg-green-50 border border-green-100 p-3 rounded-lg">
-                    <span className="text-xs text-green-700 font-bold block mb-1">POPRAWNA ODPOWIEDŹ:</span>
-                    <span className="text-green-900 font-medium">{q.correct_answer}</span>
-                  </div>
-                  <div className="bg-red-50 border border-red-100 p-3 rounded-lg">
-                    <span className="text-xs text-red-700 font-bold block mb-1">BŁĘDNE ODPOWIEDZI:</span>
-                    <ul className="text-red-900 text-sm list-disc pl-4 space-y-1">
-                       {Array.isArray(q.wrong_answers) ? q.wrong_answers.map((w: string, i: number) => (
-                         <li key={i}>{w}</li>
-                       )) : <li>{typeof q.wrong_answers === 'string' ? q.wrong_answers : JSON.stringify(q.wrong_answers)}</li>}
-                    </ul>
-                  </div>
-                </div>
-
-                <VerifyButton id={q.id} />
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-12 bg-white rounded-xl border border-gray-200 flex flex-col items-center">
-              <span className="text-4xl block mb-2">🎉</span>
-              <p className="text-gray-500 font-medium">Brak pytań do zatwierdzenia. Oczekuj na działanie AI!</p>
+      <div className="space-y-6">
+        {unverified?.map((q) => (
+          <div key={q.id} className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm overflow-hidden relative group">
+            <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition">
+               <span className="text-[10px] font-black uppercase bg-gray-100 px-3 py-1 rounded-full text-gray-400">Moderacja</span>
             </div>
-          )}
-        </div>
+            
+            <div className="mb-6">
+              <span className="text-xs font-bold text-indigo-600 uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-full mb-3 inline-block">
+                {(q.courses as any)?.title || 'Brak kursu'}
+              </span>
+              <h3 className="text-xl font-black text-gray-900 leading-snug">{q.question_text}</h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+              <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                <span className="text-[10px] font-black text-emerald-600 uppercase block mb-1">Poprawna odpowiedź:</span>
+                <p className="font-bold text-emerald-900">{q.correct_answer}</p>
+              </div>
+              
+              <div className="bg-gray-50 p-4 rounded-2xl">
+                <span className="text-[10px] font-black text-gray-400 uppercase block mb-1">Błędne odpowiedzi:</span>
+                <ul className="text-sm font-medium text-gray-600 space-y-1 list-disc list-inside">
+                  {(q.wrong_answers as string[])?.map((wa, idx) => (
+                    <li key={idx}>{wa}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+
+            <QuestionActions id={q.id} />
+          </div>
+        ))}
+
+        {(!unverified || unverified.length === 0) && (
+          <div className="text-center py-32 bg-gray-50 rounded-[40px] border-2 border-dashed border-gray-200">
+             <div className="text-6xl mb-6 grayscale mix-blend-multiply opacity-20">✨</div>
+             <p className="text-gray-400 font-bold text-xl">Wszystkie pytania zostały zweryfikowane!</p>
+             <p className="text-gray-400 text-sm mt-2 font-medium">Baza pytań jest czysta i gotowa do użycia.</p>
+          </div>
+        )}
       </div>
     </div>
   )

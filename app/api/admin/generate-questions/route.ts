@@ -56,10 +56,10 @@ export async function POST(req: Request) {
 
     // Save to database as unverified questions
     const inserts = questions.map((q: any) => ({
-      course_id,
-      question_text: q.question,
-      correct_answer: q.correct_answer,
-      wrong_answers: q.wrong_answers,
+      course_id: course_id as string,
+      question_text: q.question as string,
+      correct_answer: q.correct_answer as string,
+      wrong_answers: q.wrong_answers as any, // Cast to any to satisfy Json type
       is_verified: false,
       created_by: 'ai',
     }))

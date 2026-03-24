@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 
 export default async function LessonPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -12,7 +12,7 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
     .eq('id', id)
     .single()
 
-  if (!lesson) {
+  if (!lesson || !lesson.course_id) {
     notFound()
   }
 
@@ -29,10 +29,33 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
   
   const progress = Math.round(((currentIndex + 1) / totalLessons) * 100)
 
-  // Sprawdzamy czy kurs jest już ukończony
   const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    redirect('/login')
+  }
+
+  // Weryfikacja dostępu
+  const { data: payment } = await supabase
+    .from('payments')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('course_id', lesson.course_id)
+    .eq('status', 'paid')
+    .maybeSingle()
+
+  const { data: userCourse } = await supabase
+    .from('user_courses')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('course_id', lesson.course_id)
+    .maybeSingle()
+
+  let hasAccess = false
+  if (payment || userCourse) hasAccess = true
+
+  // Completion check
   let isCompleted = false
-  if (user) {
+  if (hasAccess) {
     const { data: cert } = await supabase
       .from('certificates')
       .select('id')
@@ -78,7 +101,7 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
           ) : (
              <Link
                href={isCompleted ? "/dashboard" : `/exam/${lesson.course_id}`}
-               className={`block w-full text-center px-8 py-5 rounded-2xl font-black text-xl transition shadow-xl hover:-translate-y-1 ${
+               className={`block w-full text-center px-8 py-5 rounded-2xl font-black text-xl transition shadow-xl shadow-black/10 hover:-translate-y-1 ${
                  isCompleted
                    ? 'bg-white text-gray-900 border-2 border-gray-100 hover:bg-gray-50'
                    : 'bg-green-500 text-white hover:bg-green-600 shadow-green-500/20'

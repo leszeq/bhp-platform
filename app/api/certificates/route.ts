@@ -114,6 +114,10 @@ export async function POST(req: Request) {
     }
   }
 
+  if (!cert || !cert.verification_code) {
+    return NextResponse.json({ error: 'Could not generate certificate code' }, { status: 500 })
+  }
+
   const nameToUse = user.email?.split('@')[0] || 'Uczestnik Szkolenia'
 
   try {

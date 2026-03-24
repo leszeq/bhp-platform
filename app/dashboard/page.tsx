@@ -82,7 +82,11 @@ export default async function DashboardPage() {
                 const examsForCourse = userExams?.filter(e => e.course_id === course.id) || []
                 // Prefer passed exam, then latest by date
                 const bestExam = examsForCourse.find(e => e.status === 'passed') || 
-                                 examsForCourse.sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime())[0]
+                                 examsForCourse.sort((a, b) => {
+                                   const dateA = a.started_at ? new Date(a.started_at).getTime() : 0
+                                   const dateB = b.started_at ? new Date(b.started_at).getTime() : 0
+                                   return dateB - dateA
+                                 })[0]
                 
                 const cert = userCerts?.find(c => c.course_id === course.id)
                 

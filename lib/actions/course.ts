@@ -18,18 +18,20 @@ export async function createCourse(formData: FormData) {
   const price = Number(formData.get('price')) || 0
   const is_active = formData.get('is_active') === 'on'
 
-  if (!title) {
-    return { error: 'Tytuł jest wymagany.' }
+  const { CourseService } = await import('@/lib/services/courseService')
+  const courseService = new CourseService(supabase)
+
+  try {
+    await courseService.createCourse({
+      title,
+      description,
+      price,
+      is_active
+    })
+    
+    revalidatePath('/dashboard', 'page')
+    redirect('/dashboard')
+  } catch (err: any) {
+    return { error: err.message }
   }
-
-  const { error } = await supabase
-    .from('courses')
-    .insert([{ title, description, price, is_active }])
-
-  if (error) {
-    return { error: error.message }
-  }
-
-  revalidatePath('/dashboard', 'page')
-  redirect('/dashboard')
 }

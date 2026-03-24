@@ -16,16 +16,33 @@ export async function createCompany(formData: FormData) {
     return { error: 'Błąd autoryzacji. Spróbuj zalogować się ponownie.' }
   }
 
-  // Wstawienie firmy do bazy
-  const { error } = await supabase.from('companies').insert({ 
-    owner_id: user.id, 
-    name 
-  })
+  // Upewnij się, że użytkownik posiada rekord w tabeli public.profiles (wymagane przez FK owner_id)
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', user.id)
+    .single()
 
-  // Obsługa błędów bazy, upewnijmy się że RLS nie odrzuca wpisu
-  if (error) {
-    console.error('Błąd podczas zapisywania w DB:', error)
-    return { error: 'Wystąpił błąd po stronie bazy danych. Szczegóły: ' + error.message }
+  if (!profile) {
+    console.log(`[createCompany] Profil nie istnieje dla ${user.id}, tworzę...`)
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .insert([{ id: user.id, email: user.email }])
+    
+    if (profileError) {
+      return { error: 'Nie udało się stworzyć profilu użytkownika: ' + profileError.message }
+    }
+  }
+
+  const { CompanyService } = await import('@/lib/services/companyService')
+  const companyService = new CompanyService(supabase)
+
+  // Wstawienie firmy do bazy
+  try {
+    await companyService.createCompany(user.id, name)
+  } catch (err: any) {
+    console.error('Błąd podczas zapisywania w DB:', err)
+    return { error: 'Wystąpił błąd po stronie bazy danych. Szczegóły: ' + err.message }
   }
 
   // Wymuś odświeżenie danych o firmie dla obecnego route-a
@@ -71,7 +88,7 @@ export async function resendInvitationEmail(email: string) {
       reminder_count: (invitation.reminder_count || 0) + 1,
       email_sent_at: new Date().toISOString()
     })
-    .eq('id', invitation.id)
+    .eq('id', invitation.id as string)
 
   revalidatePath('/dashboard/b2b')
   return { success: true }

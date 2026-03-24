@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   const { error } = await supabase
     .from('question_bank')
     .update({ is_verified: true })
-    .eq('id', id)
+    .eq('id', id as string)
 
   if (error) {
      return NextResponse.json({ error: error.message }, { status: 500 })

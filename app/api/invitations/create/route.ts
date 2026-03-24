@@ -16,18 +16,16 @@ export async function POST(req: Request) {
     // 7 days expiration
     const expires_at = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString()
 
-    const { error } = await supabase.from('invitations').insert({
+    const { CompanyService } = await import('@/lib/services/companyService')
+    const companyService = new CompanyService(supabase)
+
+    await companyService.createInvitation({
       email,
       company_id,
-      course_id: course_id || null, // Optional if default company course is desired
+      course_id,
       token,
       expires_at,
     })
-
-    if (error) {
-       console.error('Error inserting invitation:', error)
-       return NextResponse.json({ error: 'Nie udało się stworzyć zaproszenia' }, { status: 500 })
-    }
 
     const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'
     const link = `${origin}/join?token=${token}`
