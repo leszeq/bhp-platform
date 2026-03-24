@@ -36,9 +36,14 @@ export async function POST(req: Request) {
     const { sendEmail } = await import('@/utils/sendEmail')
 
     const emailContent = inviteEmail(link)
-    await sendEmail(email, emailContent.subject, emailContent.html)
+    const emailResult = await sendEmail(email, emailContent.subject, emailContent.html)
 
-    return NextResponse.json({ link, ok: true })
+    if (!emailResult.success) {
+      console.warn('Email send failed but invitation created:', emailResult.error)
+      // We still return ok for the invite, but maybe explain it's pending email?
+    }
+
+    return NextResponse.json({ link, ok: true, emailSent: emailResult.success })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

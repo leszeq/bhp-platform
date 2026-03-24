@@ -29,6 +29,20 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
   
   const progress = Math.round(((currentIndex + 1) / totalLessons) * 100)
 
+  // Sprawdzamy czy kurs jest już ukończony
+  const { data: { user } } = await supabase.auth.getUser()
+  let isCompleted = false
+  if (user) {
+    const { data: cert } = await supabase
+      .from('certificates')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('course_id', lesson.course_id)
+      .limit(1)
+      .maybeSingle()
+    if (cert) isCompleted = true
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-2xl mx-auto bg-white min-h-screen shadow-sm border-x border-gray-100 flex flex-col relative">
@@ -63,10 +77,14 @@ export default async function LessonPage({ params }: { params: Promise<{ id: str
              </Link>
           ) : (
              <Link
-               href={`/exam/${lesson.course_id}`}
-               className="block w-full text-center bg-green-500 text-white px-8 py-5 rounded-2xl font-black text-xl hover:bg-green-600 transition shadow-xl shadow-green-500/20 hover:-translate-y-1"
+               href={isCompleted ? "/dashboard" : `/exam/${lesson.course_id}`}
+               className={`block w-full text-center px-8 py-5 rounded-2xl font-black text-xl transition shadow-xl hover:-translate-y-1 ${
+                 isCompleted
+                   ? 'bg-white text-gray-900 border-2 border-gray-100 hover:bg-gray-50'
+                   : 'bg-green-500 text-white hover:bg-green-600 shadow-green-500/20'
+               }`}
              >
-               Zakończ i przejdź do Egzaminu 🎓
+               {isCompleted ? 'Ukończono - Wróć do panelu ✅' : 'Zakończ i przejdź do Egzaminu 🎓'}
              </Link>
           )}
         </div>

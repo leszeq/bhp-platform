@@ -11,21 +11,59 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const { exam_id } = await req.json()
+  const { user_id, exam_id } = await req.json()
 
-  // 1. Verify the exam was actually passed by the current user
-  const { data: examData } = await supabase
+  if (!user_id || !exam_id) {
+    return NextResponse.json({ error: 'Missing user_id or exam_id' }, { status: 400 })
+  }
+
+  console.log('[CERT] Generating request for exam_id:', exam_id, 'user_id:', user.id)
+
+  const { data: initialExamData } = await supabase
     .from('exams')
-    .select('user_id, status, course_id')
+    .select('id, user_id, status, course_id')
     .eq('id', exam_id)
-    .single()
+    .maybeSingle()
 
-  if (!examData || examData.user_id !== user.id) {
-     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  let examData = initialExamData
+  
+  if (!examData || examData.status !== 'passed') {
+    console.log('[CERT] Provided exam_id is not passed or missing. Searching for fallback...')
+    
+    // Use course_id from initial data if available, or fetch it again
+    const courseIdToSearch = examData?.course_id || (await supabase.from('exams').select('course_id').eq('id', exam_id).limit(1).maybeSingle()).data?.course_id
+    
+    if (courseIdToSearch) {
+      const { data: fallbackExam } = await supabase
+        .from('exams')
+        .select('id, user_id, status, course_id')
+        .eq('course_id', courseIdToSearch)
+        .eq('user_id', user.id)
+        .eq('status', 'passed')
+        .order('finished_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        
+      if (fallbackExam) {
+        console.log('[CERT] Found fallback passed exam:', fallbackExam.id)
+        examData = fallbackExam as any
+      }
+    }
+  }
+
+  if (!examData) {
+    console.error('[CERT] Exam not found:', exam_id)
+    return NextResponse.json({ error: 'Nie odnaleziono egzaminu dla tego zapytania.' }, { status: 404 })
+  }
+
+  if (examData.user_id !== user.id) {
+    console.error('[CERT] Forbidden: User mismatch')
+    return NextResponse.json({ error: 'Nie masz uprawnień do tego certyfikatu.' }, { status: 403 })
   }
   
   if (examData.status !== 'passed') {
-     return NextResponse.json({ error: 'Exam not passed' }, { status: 400 })
+    console.warn('[CERT] Rejected: Status is:', examData.status)
+    return NextResponse.json({ error: `Egzamin nie został jeszcze zaliczony (Status: ${examData.status}). Upewnij się, że ukończyłeś test z wynikiem min. 70%.` }, { status: 400 })
   }
 
   // 2. Check if certificate already exists for this exam
@@ -33,8 +71,8 @@ export async function POST(req: Request) {
   const { data: existingCert } = await supabase
     .from('certificates')
     .select('*')
-    .eq('exam_id', exam_id)
-    .single()
+    .eq('exam_id', examData.id)
+    .maybeSingle()
 
   if (existingCert) {
     cert = existingCert
@@ -66,7 +104,10 @@ export async function POST(req: Request) {
 
       const emailContent = certificateEmail(link)
       if (user.email) {
-         await sendEmail(user.email, emailContent.subject, emailContent.html)
+         const result = await sendEmail(user.email, emailContent.subject, emailContent.html)
+         if (!result.success) {
+           console.warn(`[CERT E-MAIL FAILED] ${result.error}`)
+         }
       }
     } catch (e) {
       console.error('Failed to send cert email:', e)
@@ -74,15 +115,24 @@ export async function POST(req: Request) {
   }
 
   const nameToUse = user.email?.split('@')[0] || 'Uczestnik Szkolenia'
-  const nameAscii = nameToUse.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ł/g, "l").replace(/Ł/g, "L")
 
-  const pdfBytes = await generateCertificate(nameAscii, cert.verification_code)
+  try {
+    const pdfBytes = await generateCertificate(nameToUse, cert.verification_code)
+    console.log('[CERT] PDF generated successfully, size:', pdfBytes.length)
 
-  return new Response(pdfBytes as any, {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="certyfikat-bhp-${cert.verification_code.substring(0,8)}.pdf"`
-    },
-  })
+    return new Response(pdfBytes as any, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Cache-Control': 'no-store, max-age=0',
+        'Content-Disposition': `attachment; filename="certyfikat-bhp-${cert.verification_code.substring(0,8)}.pdf"`
+      },
+    })
+  } catch (genError: any) {
+    console.error('[CERT] PDF Generator failed:', genError)
+    return NextResponse.json({ 
+      error: 'Błąd podczas generowania pliku PDF',
+      detail: genError?.message || String(genError)
+    }, { status: 500 })
+  }
 }

@@ -22,22 +22,35 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
   // Weryfikacja płatności
   let hasAccess = false
   if (user) {
-     const { data: payment } = await supabase
-      .from('payments')
-      .select('*')
+      const { data: payment } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('course_id', id)
+        .eq('status', 'paid')
+        .maybeSingle()
+        
+      const { data: userCourse } = await supabase
+        .from('user_courses')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('course_id', id)
+        .maybeSingle()
+       
+      if (payment || userCourse) hasAccess = true
+  }
+
+  // Check completion
+  let isCompleted = false
+  if (hasAccess && user) {
+    const { data: cert } = await supabase
+      .from('certificates')
+      .select('id')
       .eq('user_id', user.id)
       .eq('course_id', id)
-      .eq('status', 'paid')
-      .single()
-      
-     const { data: userCourse } = await supabase
-      .from('user_courses')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('course_id', id)
-      .single()
-      
-     if (payment || userCourse) hasAccess = true
+      .limit(1)
+      .maybeSingle()
+    if (cert) isCompleted = true
   }
 
   // Zezwól na dostęp jeśli cena to 0 
@@ -81,16 +94,26 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
             </div>
           ) : (
             <div className="relative z-10 mt-8">
-               <div className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 px-5 py-2.5 rounded-full font-bold mb-8 text-sm border border-indigo-100">
-                 <span>⏱</span> Zajmie tylko ok. 30 minut
-               </div>
+               {isCompleted ? (
+                 <div className="inline-flex items-center gap-3 bg-green-50 text-green-700 px-6 py-3 rounded-full font-bold mb-10 text-sm border border-green-100 shadow-sm">
+                   <span className="text-xl">✅</span> Kurs ukończony pomyślnie
+                 </div>
+               ) : (
+                 <div className="inline-flex items-center gap-2 bg-indigo-50 text-indigo-700 px-5 py-2.5 rounded-full font-bold mb-8 text-sm border border-indigo-100">
+                   <span>⏱</span> Zajmie tylko ok. 30 minut
+                 </div>
+               )}
                
                {lessons && lessons.length > 0 ? (
                  <Link
                     href={`/lessons/${lessons[0].id}`}
-                    className="block w-full bg-black text-white px-10 py-5 rounded-2xl text-xl font-black hover:bg-gray-800 transition shadow-xl shadow-black/10 hover:-translate-y-1"
+                    className={`block w-full px-10 py-5 rounded-2xl text-xl font-black transition shadow-xl hover:-translate-y-1 ${
+                      isCompleted 
+                        ? 'bg-white text-gray-900 border-2 border-gray-100 hover:bg-gray-50' 
+                        : 'bg-black text-white hover:bg-gray-800 shadow-black/10'
+                    }`}
                  >
-                    Rozpocznij szkolenie 🚀
+                    {isCompleted ? 'Przejrzyj materiały 📚' : 'Rozpocznij szkolenie 🚀'}
                  </Link>
                ) : (
                  <div className="p-6 bg-amber-50 text-amber-700 rounded-xl font-bold border border-amber-200">

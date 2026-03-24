@@ -32,3 +32,47 @@ export async function createCompany(formData: FormData) {
   revalidatePath('/dashboard/b2b')
   return { success: true }
 }
+
+export async function resendInvitationEmail(email: string) {
+  const supabase = await createClient()
+
+  const { data: invitation, error: invError } = await supabase
+    .from('invitations')
+    .select('*')
+    .eq('email', email)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (invError || !invitation) {
+    return { error: 'Nie znaleziono aktywnego zaproszenia dla tego adresu email.' }
+  }
+
+  const { headers } = await import('next/headers')
+  const host = (await headers()).get('host')
+  const protocol = host?.includes('localhost') ? 'http' : 'https'
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || `${protocol}://${host}`
+  const link = `${origin}/join?token=${invitation.token}`
+
+  const { reminderEmail } = await import('@/emails/templates')
+  const { sendEmail } = await import('@/utils/sendEmail')
+
+  const emailContent = reminderEmail(link)
+  const result = await sendEmail(email, emailContent.subject, emailContent.html)
+
+  if (!result.success) {
+    return { error: 'Błąd wysyłki e-mail: ' + result.error }
+  }
+
+  await supabase
+    .from('invitations')
+    .update({
+      reminder_count: (invitation.reminder_count || 0) + 1,
+      email_sent_at: new Date().toISOString()
+    })
+    .eq('id', invitation.id)
+
+  revalidatePath('/dashboard/b2b')
+  return { success: true }
+}

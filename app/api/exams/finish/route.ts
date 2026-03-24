@@ -30,12 +30,20 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'No answers found' }, { status: 400 })
   }
 
-  const correct = answers.filter(a => a.is_correct).length
-  const score = answers.length > 0 ? Math.round((correct / answers.length) * 100) : 0
+  const correct = answers.filter(a => a.is_correct === true).length
+  const total = answers.length
+  const score = total > 0 ? Math.round((correct / total) * 100) : 0
+
+  console.log('[FINISH] Exam:', exam_id, {
+    correct,
+    total,
+    score,
+    details: answers.map(a => a.is_correct)
+  })
 
   const status = score >= 70 ? 'passed' : 'failed'
 
-  await supabase
+  const { error: updateError } = await supabase
     .from('exams')
     .update({
       score,
@@ -44,5 +52,16 @@ export async function POST(req: Request) {
     })
     .eq('id', exam_id)
 
-  return NextResponse.json({ score, status })
+  if (updateError) {
+    console.error('[FINISH] Status update error:', updateError)
+    return NextResponse.json({ error: 'Nie udało się zaktualizować statusu egzaminu' }, { status: 500 })
+  }
+
+  return NextResponse.json({ 
+    score, 
+    status,
+    correct,
+    total,
+    passed: score >= 70 
+  })
 }

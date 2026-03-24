@@ -68,17 +68,19 @@ export async function GET(req: Request) {
 
          const emailTpl = courseStatus === 'in_progress' ? inProgressEmail(link) : reminderEmail(link)
 
-         await sendEmail(inv.email, emailTpl.subject, emailTpl.html)
+         const emailResult = await sendEmail(inv.email, emailTpl.subject, emailTpl.html)
 
-         await supabaseAdmin
-           .from('invitations')
-           .update({
-             reminder_count: inv.reminder_count + 1,
-             email_sent_at: new Date().toISOString()
-           })
-           .eq('id', inv.id)
+         if (emailResult.success) {
+           await supabaseAdmin
+             .from('invitations')
+             .update({
+               reminder_count: inv.reminder_count + 1,
+               email_sent_at: new Date().toISOString()
+             })
+             .eq('id', inv.id)
 
-         emailsSent++
+           emailsSent++
+         }
       }
     }
 

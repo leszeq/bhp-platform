@@ -26,20 +26,42 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
+  const exams = Array.isArray(eq.exams) ? eq.exams[0] : eq.exams
+  const qb = Array.isArray(eq.question_bank) ? eq.question_bank[0] : eq.question_bank
+
+  if (!exams || !qb) {
+    console.error('[ANSWER] Missing relation data:', { exams: !!exams, qb: !!qb })
+    return NextResponse.json({ error: 'Data integrity error' }, { status: 500 })
+  }
+
   // Check if this exam belongs to user
-  if ((eq.exams as any).user_id !== user.id) {
+  if ((exams as any).user_id !== user.id) {
      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
-  const isCorrect = (eq.question_bank as any).correct_answer === answer
+  const correctAnswer = qb.correct_answer
+  const isCorrect = correctAnswer?.toString().trim() === answer?.toString().trim()
 
-  await supabase
+  console.log('[ANSWER] Comparison:', {
+    questionId: eq.id,
+    received: `|${answer}|`,
+    expected: `|${correctAnswer}|`,
+    match: isCorrect,
+    qb_type: Array.isArray(eq.question_bank) ? 'array' : 'object'
+  })
+
+  const { error: updateError } = await supabase
     .from('exam_questions')
     .update({
       selected_answer: answer,
       is_correct: isCorrect,
     })
     .eq('id', exam_question_id)
+
+  if (updateError) {
+    console.error('[ANSWER] Update error:', updateError)
+    return NextResponse.json({ error: 'Failed to save answer' }, { status: 500 })
+  }
 
   return NextResponse.json({ ok: true, isCorrect })
 }

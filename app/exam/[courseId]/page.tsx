@@ -2,21 +2,18 @@
 
 import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function ExamPage({ params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = use(params)
+  const router = useRouter()
   const [examId, setExamId] = useState<string | null>(null)
   const [questions, setQuestions] = useState<any[]>([])
   const [current, setCurrent] = useState(0)
   const [selected, setSelected] = useState<string | null>(null)
   
-  const [finished, setFinished] = useState(false)
-  const [score, setScore] = useState<number | null>(null)
-  const [status, setStatus] = useState<string | null>(null)
-  
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [isGeneratingCert, setIsGeneratingCert] = useState(false)
 
   // Start exam
   useEffect(() => {
@@ -87,9 +84,9 @@ export default function ExamPage({ params }: { params: Promise<{ courseId: strin
             body: JSON.stringify({ exam_id: examId })
           })
           const finData = await finRes.json()
-          setScore(finData.score)
-          setStatus(finData.status)
-          setFinished(true)
+          
+          // Redirect to the new result page
+          router.push(`/exam/result?score=${finData.score}&passed=${finData.passed}&exam_id=${examId}`)
         }
       }, 1200)
     } catch (err) {
@@ -97,30 +94,6 @@ export default function ExamPage({ params }: { params: Promise<{ courseId: strin
     }
   }
 
-  const downloadCertificate = async () => {
-    setIsGeneratingCert(true)
-    try {
-        const res = await fetch('/api/certificates', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ exam_id: examId })
-        })
-        
-        const blob = await res.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `certyfikat-bhp.pdf`
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        window.URL.revokeObjectURL(url)
-    } catch (err) {
-        console.error(err)
-    } finally {
-        setIsGeneratingCert(false)
-    }
-  }
 
   if (loading) {
      return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="text-gray-500 font-medium tracking-wide">Ładowanie egzaminu...</div></div>
@@ -138,51 +111,6 @@ export default function ExamPage({ params }: { params: Promise<{ courseId: strin
      )
   }
 
-  if (finished) {
-    const passed = status === 'passed'
-
-    return (
-      <div className="min-h-screen bg-gray-50 p-6 flex items-center justify-center">
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 max-w-lg w-full text-center">
-          <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-             {passed ? '🏆' : '📚'}
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
-            Egzamin {passed ? 'Zaliczony!' : 'Zakończony'}
-          </h1>
-          <p className="text-gray-600 mb-8">
-            Twój wynik to <strong>{score}%</strong> (wymagane 70%).
-          </p>
-          
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            {!passed && (
-               <button 
-                 onClick={() => window.location.reload()}
-                 className="w-full sm:w-auto inline-block bg-white border border-gray-300 text-gray-700 px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
-               >
-                 Spróbuj ponownie
-               </button>
-            )}
-            {passed && (
-               <button 
-                 onClick={downloadCertificate}
-                 disabled={isGeneratingCert}
-                 className="w-full sm:w-auto inline-block bg-green-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-green-700 transition shadow-sm disabled:opacity-50"
-               >
-                 {isGeneratingCert ? 'Generowanie...' : 'Pobierz Certyfikat PDF'}
-               </button>
-            )}
-            <Link 
-              href="/dashboard"
-              className="w-full sm:w-auto inline-block bg-indigo-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-indigo-700 transition shadow-sm"
-            >
-              Powrót do Kokpitu
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   const qData = questions[current]
   if (!qData) return <div className="p-6 text-center text-gray-500 min-h-screen pt-24">Brak pytań pasujących do tego egzaminu.</div>

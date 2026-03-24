@@ -1,14 +1,21 @@
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { CreateCompanyForm } from './components/CreateCompanyForm'
 import { AddEmployeeModal } from './components/AddEmployeeModal'
+import { RemindButton } from './components/RemindButton'
 import { signOut } from '@/lib/actions/auth'
 
 export default async function B2BDashboard() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+
+  const supabaseAdmin = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  )
 
   const { data: company } = await supabase
     .from('companies')
@@ -27,7 +34,8 @@ export default async function B2BDashboard() {
     )
   }
 
-  const { data: companyUsers } = await supabase
+  // Use Admin Client to bypass RLS issues for the list
+  const { data: companyUsers } = await supabaseAdmin
     .from('company_users')
     .select(`
       user_id,
@@ -35,24 +43,27 @@ export default async function B2BDashboard() {
     `)
     .eq('company_id', company.id)
 
-  const { data: pendingInvitations } = await supabase
+  const { data: pendingInvitations } = await supabaseAdmin
     .from('invitations')
     .select('id, email, status, created_at')
     .eq('company_id', company.id)
     .eq('status', 'pending')
+
+  console.log('[B2B] companyUsers:', companyUsers?.length)
+  console.log('[B2B] pendingInvitations:', pendingInvitations?.length)
 
   const userIds = companyUsers?.map((cu) => cu.user_id) || []
   let certificates: any[] = []
   let exams: any[] = []
   
   if (userIds.length > 0) {
-    const { data: certs } = await supabase
+    const { data: certs } = await supabaseAdmin
       .from('certificates')
       .select('*')
       .in('user_id', userIds)
     certificates = certs || []
 
-    const { data: activeExams } = await supabase
+    const { data: activeExams } = await supabaseAdmin
       .from('exams')
       .select('*')
       .in('user_id', userIds)
@@ -63,7 +74,7 @@ export default async function B2BDashboard() {
   const employees: { id: string, email: string, status: string, type: string }[] = []
 
   companyUsers?.forEach((cu) => {
-    const email = (cu.profiles as any)?.email
+    const email = (cu.profiles as any)?.email || 'Użytkownik bez adresu email'
     const hasCert = certificates.some(c => c.user_id === cu.user_id)
     const hasExam = exams.some(e => e.user_id === cu.user_id)
     
@@ -175,9 +186,7 @@ export default async function B2BDashboard() {
                       ↓ Certyfikat
                     </button>
                   ) : (
-                    <button className="text-gray-500 font-semibold text-sm border border-gray-200 px-4 py-2 flex-shrink-0 rounded-lg hover:bg-gray-100 transition whitespace-nowrap">
-                      Przypomnij
-                    </button>
+                    <RemindButton email={e.email} />
                   )}
                 </div>
               </div>

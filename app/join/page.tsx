@@ -32,6 +32,13 @@ function JoinFlow() {
           setInvitation(data.invitation)
         } else {
           setValid(false)
+          if (data.reason === 'expired') {
+             setError('Ten link stracił już ważność (7 dni od wysłania).')
+          } else if (data.reason === 'not_pending') {
+             setError('Zaproszenie zostało już wykorzystane.')
+          } else {
+             setError('Nie znaleźliśmy tego zaproszenia w systemie.')
+          }
         }
         setValidating(false)
       })
@@ -55,7 +62,8 @@ function JoinFlow() {
       const data = await res.json()
       
       if (!res.ok) {
-        setError(data.error || 'Wystąpił błąd krytyczny.')
+        const errorMsg = data.details ? `${data.error} (${data.details})` : (data.error || 'Wystąpił błąd krytyczny.')
+        setError(errorMsg)
         setJoining(false)
         return
       }
@@ -81,6 +89,7 @@ function JoinFlow() {
        <div className="bg-red-50 text-red-600 p-8 rounded-2xl text-center border border-red-100 shadow-sm max-w-md mx-auto">
          <div className="text-4xl mb-4">❌</div>
          <h2 className="text-xl font-bold mb-2">Zaproszenie wygasło lub jest nieprawidłowe</h2>
+         {error && <p className="text-sm font-bold bg-white/50 p-2 rounded-lg mb-4 border border-red-100">{error}</p>}
          <p className="text-sm opacity-80 mt-2">Ze względów bezpieczeństwa zablokowaliśmy sesję. Skontaktuj się ze swoim pracodawcą, aby wygenerować nówy link.</p>
        </div>
     )
