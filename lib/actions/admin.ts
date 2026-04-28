@@ -96,3 +96,47 @@ export async function deleteCourseAction(id: string) {
     return { error: err.message }
   }
 }
+export async function createCourseWithQuestionsAction(title: string, description: string, price: number, questionIds: string[]) {
+  const supabase = await createClient()
+  const adminService = new AdminService(supabase)
+
+  try {
+    const course = await adminService.createCourseWithQuestions({
+      title,
+      description,
+      price,
+      is_active: true
+    }, questionIds)
+    
+    revalidatePath('/admin/courses')
+    revalidatePath('/dashboard')
+    return { success: true, courseId: course.id }
+  } catch (err: any) {
+    return { error: err.message }
+  }
+}
+export async function createQuestionAction(data: {
+  course_id: string | null,
+  question_text: string,
+  correct_answer: string,
+  wrong_answers: string[]
+}) {
+  const supabase = await createClient()
+  const adminService = new AdminService(supabase)
+
+  try {
+    const { error } = await supabase
+      .from('question_bank')
+      .insert({
+        ...data,
+        is_verified: false, // Ustawiamy na false, aby admin widział je na liście moderacji i mógł potwierdzić
+        created_by: 'admin_manual'
+      })
+
+    if (error) throw error
+    revalidatePath('/admin/questions')
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message }
+  }
+}

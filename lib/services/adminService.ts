@@ -156,4 +156,88 @@ export class AdminService {
     if (error) throw error
     return true
   }
+
+  /**
+   * Pobiera wszystkie zatwierdzone pytania (dostępne do przypisania)
+   */
+  async getVerifiedQuestions() {
+    const { data, error } = await this.supabase
+      .from('question_bank')
+      .select('*')
+      .eq('is_verified', true)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data
+  }
+
+  /**
+   * Tworzy kurs i przypisuje do niego wybrane pytania
+   */
+  async createCourseWithQuestions(courseData: Database['public']['Tables']['courses']['Insert'], questionIds: string[]) {
+    // 1. Stwórz kurs
+    const { data: course, error: courseError } = await this.supabase
+      .from('courses')
+      .insert([courseData])
+      .select()
+      .single()
+
+    if (courseError) throw courseError
+
+    // 2. Pobierz wybrane pytania i STWÓRZ KOPIE dla nowego kursu
+    if (questionIds.length > 0) {
+      const { data: sourceQuestions } = await this.supabase
+        .from('question_bank')
+        .select('*')
+        .in('id', questionIds)
+
+      if (sourceQuestions && sourceQuestions.length > 0) {
+        const duplicatedQuestions = sourceQuestions.map(q => ({
+          course_id: course.id,
+          question_text: q.question_text,
+          correct_answer: q.correct_answer,
+          wrong_answers: q.wrong_answers,
+          difficulty: q.difficulty,
+          is_verified: true,
+          created_by: 'cloned'
+        }))
+
+        const { error: questionsError } = await this.supabase
+          .from('question_bank')
+          .insert(duplicatedQuestions)
+
+        if (questionsError) {
+          console.error('[AdminService] Błąd podczas kopiowania pytań:', questionsError)
+        }
+      }
+    }
+
+    return course
+  }
+  /**
+   * Pobiera wszystkie pytania z bazy (zarówno zweryfikowane jak i nie)
+   */
+  async getAllQuestions() {
+    const { data, error } = await this.supabase
+      .from('question_bank')
+      .select('*, courses(title)')
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data
+  }
+
+  /**
+   * Pobiera pytania przypisane do konkretnego kursu
+   */
+  async getCourseQuestions(courseId: string) {
+    const { data, error } = await this.supabase
+      .from('question_bank')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('created_at', { ascending: false })
+
+    if (error) throw error
+    return data
+  }
 }

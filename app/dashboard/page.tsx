@@ -14,12 +14,6 @@ export default async function DashboardPage() {
     redirect('/login')
   }
 
-  // Fetch courses from DB
-  const { data: courses } = await supabase
-    .from('courses')
-    .select('*')
-    .eq('is_active', true)
-    .order('created_at', { ascending: false })
 
   // Fetch progress
   const { data: userExams } = await supabase
@@ -32,6 +26,61 @@ export default async function DashboardPage() {
     .select('*')
     .eq('user_id', user.id)
 
+  // Fetch profile to check role and company
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, company_id')
+    .eq('id', user.id)
+    .single()
+
+  // Check if user is a company owner
+  const { data: ownedCompany } = await supabase
+    .from('companies')
+    .select('id')
+    .eq('owner_id', user.id)
+    .single()
+
+  let courses: any[] = []
+  
+  if (profile?.role === 'admin' || ownedCompany) {
+    // Admins and Owners see the full global pool
+    const { data } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+    courses = data || []
+  } else if (profile?.company_id) {
+    // Employees see courses assigned to their company
+    const { data: assigned } = await supabase
+      .from('company_courses')
+      .select('courses(*)')
+      .eq('company_id', profile.company_id)
+      
+    const companyCourses = assigned?.map((ac: any) => ac.courses).filter(Boolean) || []
+
+    // AND courses they've personally paid for
+    const { data: paid } = await supabase
+      .from('payments')
+      .select('courses(*)')
+      .eq('user_id', user.id)
+      .eq('status', 'paid')
+    
+    const paidCourses = paid?.map((p: any) => p.courses).filter(Boolean) || []
+
+    // Merge and remove duplicates
+    const all = [...companyCourses, ...paidCourses]
+    courses = Array.from(new Map(all.map(c => [c.id, c])).values())
+  } else {
+    // Personal users see all (can buy them)
+    const { data } = await supabase
+      .from('courses')
+      .select('*')
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+    courses = data || []
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
@@ -39,6 +88,14 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Edukacja BHP</h1>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-500 hidden sm:block font-medium">{user.email}</span>
+            {profile?.role === 'admin' && (
+              <Link 
+                href="/admin"
+                className="text-sm font-bold text-indigo-600 hover:text-indigo-700 border border-indigo-100 rounded-xl px-4 py-2 bg-indigo-50 hover:bg-indigo-100 transition shadow-sm"
+              >
+                Panel Admina
+              </Link>
+            )}
             <form action={signOut}>
               <button
                 type="submit"
@@ -61,18 +118,30 @@ export default async function DashboardPage() {
               <p className="text-gray-500 font-medium">Wybierz kurs, aby rozpocząć i uzyskać certyfikat.</p>
             </div>
             <div className="flex gap-3">
-              <Link
-                href="/dashboard/b2b"
-                className="mt-4 sm:mt-0 inline-flex items-center px-6 py-3 bg-white text-gray-700 hover:bg-gray-50 font-bold text-sm rounded-2xl transition border border-gray-200 shadow-sm"
-              >
-                🏢 Panel Firmowy
-              </Link>
-              <Link
-                href="/dashboard/courses/new"
-                className="mt-4 sm:mt-0 inline-flex items-center px-6 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-sm rounded-2xl transition border border-indigo-100 shadow-sm"
-              >
-                + Dodaj kurs
-              </Link>
+              {(profile?.role === 'admin' || ownedCompany) && (
+                <Link
+                  href="/dashboard/b2b"
+                  className="mt-4 sm:mt-0 inline-flex items-center px-6 py-3 bg-white text-gray-700 hover:bg-gray-50 font-bold text-sm rounded-2xl transition border border-gray-200 shadow-sm"
+                >
+                  🏢 Panel Firmowy
+                </Link>
+              )}
+              
+              {profile?.role === 'admin' ? (
+                <Link
+                  href="/admin/courses/new"
+                  className="mt-4 sm:mt-0 inline-flex items-center px-6 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-sm rounded-2xl transition border border-indigo-100 shadow-sm"
+                >
+                  + Nowy kurs (Wizard)
+                </Link>
+              ) : ownedCompany ? (
+                <Link
+                  href="/dashboard/b2b/courses/add"
+                  className="mt-4 sm:mt-0 inline-flex items-center px-6 py-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-bold text-sm rounded-2xl transition border border-indigo-100 shadow-sm"
+                >
+                  + Dodaj z katalogu
+                </Link>
+              ) : null}
             </div>
           </div>
 

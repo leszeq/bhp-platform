@@ -18,7 +18,7 @@ export default async function AdminCoursesPage() {
           <p className="text-gray-500 mt-2 font-medium">Zarządzaj dostępnymi szkoleniami i ich strukturą.</p>
         </div>
         <Link 
-          href="/dashboard/courses/new" 
+          href="/admin/courses/new" 
           className="bg-black text-white px-6 py-3 rounded-2xl font-bold hover:bg-gray-800 transition"
         >
           ➕ Nowy kurs

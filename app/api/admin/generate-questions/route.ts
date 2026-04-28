@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { openai } from '@/lib/openai'
+import { openai, isAiMockMode } from '@/lib/openai'
 import { createClient } from '@/lib/supabase/server'
 
 const prompt = `
@@ -36,15 +36,64 @@ export async function POST(req: Request) {
 
   const { course_id, topic } = await req.json()
 
+  // MOCK MODE FOR TESTING
+  if (isAiMockMode) {
+    const mockQuestions = [
+      {
+        question: `Pytanie testowe o temacie: ${topic} - 1`,
+        correct_answer: "To jest poprawna odpowiedź (MOCK)",
+        wrong_answers: ["Zła 1", "Zła 2", "Zła 3"]
+      },
+      {
+        question: `Pytanie testowe o temacie: ${topic} - 2`,
+        correct_answer: "Prawidłowa opcja (MOCK)",
+        wrong_answers: ["Błędna A", "Błędna B", "Błędna C"]
+      }
+    ]
+
+    const inserts = mockQuestions.map(q => ({
+      course_id: course_id as string,
+      question_text: q.question,
+      correct_answer: q.correct_answer,
+      wrong_answers: q.wrong_answers,
+      is_verified: false,
+      created_by: 'mock_ai'
+    }))
+
+    await supabase.from('question_bank').insert(inserts)
+    return NextResponse.json({ ok: true, count: inserts.length })
+  }
+
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: 'You are a BHP expert. Always respond in valid JSON.' },
-        { role: 'user', content: `Temat: ${topic}\n\n${prompt}` },
-      ],
-    })
+    let completion
+    let attempts = 0
+    const maxAttempts = 3
+
+    while (attempts < maxAttempts) {
+      try {
+        completion = await openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: 'You are a BHP expert. Always respond in valid JSON.' },
+            { role: 'user', content: `Temat: ${topic}\n\n${prompt}` },
+          ],
+        })
+        break // Sukces - wyjdź z pętli
+      } catch (err: any) {
+        attempts++
+        if (err.status === 429 && attempts < maxAttempts) {
+          console.warn(`[AI] Rate limit hit. Attempt ${attempts}/${maxAttempts}. Waiting 2s...`)
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          continue
+        }
+        throw err
+      }
+    }
+
+    if (!completion) {
+      throw new Error('Przekroczono limit zapytań AI. Spróbuj ponownie za chwilę.')
+    }
 
     const content = completion.choices[0].message.content!
     const parsed = JSON.parse(content)

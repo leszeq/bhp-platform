@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { verifyQuestionAction, deleteQuestionAction } from '@/lib/actions/admin'
 
-export function QuestionActions({ id }: { id: string }) {
+export function QuestionActions({ id, isVerified = false }: { id: string, isVerified?: boolean }) {
   const [loading, setLoading] = useState(false)
 
   const handleVerify = async () => {
@@ -21,19 +21,21 @@ export function QuestionActions({ id }: { id: string }) {
 
   return (
     <div className="flex items-center space-x-4">
-      <button 
-        onClick={handleVerify}
-        disabled={loading}
-        className="flex-1 bg-black text-white py-4 rounded-2xl font-bold hover:bg-gray-800 transition shadow-xl shadow-black/10 disabled:opacity-50"
-      >
-        {loading ? 'Przetwarzanie...' : 'Zatwierdź pytanie ✅'}
-      </button>
+      {!isVerified && (
+        <button 
+          onClick={handleVerify}
+          disabled={loading}
+          className="flex-1 bg-black text-white py-4 rounded-2xl font-bold hover:bg-gray-800 transition shadow-xl shadow-black/10 disabled:opacity-50"
+        >
+          {loading ? 'Przetwarzanie...' : 'Zatwierdź pytanie ✅'}
+        </button>
+      )}
       <button 
         onClick={handleDelete}
         disabled={loading}
-        className="px-8 bg-gray-50 text-red-500 py-4 rounded-2xl font-bold hover:bg-red-50 hover:text-red-600 transition disabled:opacity-50"
+        className={`${isVerified ? 'flex-1' : 'px-8'} bg-gray-50 text-red-500 py-4 rounded-2xl font-bold hover:bg-red-50 hover:text-red-600 transition disabled:opacity-50`}
       >
-        {loading ? '...' : 'Odrzuć'}
+        {loading ? '...' : isVerified ? 'Usuń z bazy 🗑️' : 'Odrzuć'}
       </button>
     </div>
   )

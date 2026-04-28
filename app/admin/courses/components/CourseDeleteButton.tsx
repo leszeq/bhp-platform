@@ -8,20 +8,27 @@ import { useRouter } from 'next/navigation'
 export function CourseDeleteButton({ id, redirectOnSuccess = false }: { id: string, redirectOnSuccess?: boolean }) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [errorMessage, setErrorMessage] = useState('')
   const router = useRouter()
 
   async function handleDelete() {
     setLoading(true)
+    setErrorMessage('')
     const result = await deleteCourseAction(id)
     setLoading(false)
 
     if (result.success) {
-      setIsOpen(false)
-      if (redirectOnSuccess) {
-        router.push('/admin/courses')
-      }
+      setStatus('success')
+      setTimeout(() => {
+        setIsOpen(false)
+        if (redirectOnSuccess) {
+          router.push('/admin/courses')
+        }
+      }, 1000)
     } else {
-      alert(result.error || 'Wystąpił błąd podczas usuwania kursu')
+      setStatus('error')
+      setErrorMessage(result.error || 'Wystąpił błąd podczas usuwania kursu')
     }
   }
 
@@ -42,8 +49,10 @@ export function CourseDeleteButton({ id, redirectOnSuccess = false }: { id: stri
         onClose={() => setIsOpen(false)}
         onConfirm={handleDelete}
         loading={loading}
+        status={status}
+        errorMessage={errorMessage}
         title="Usuń kurs"
-        message="Czy na pewno chcesz usunąć ten kurs? Tej operacji nie można cofnąć, a wszystkie powiązane lekcje zostaną skasowane."
+        message="Czy na pewno chcesz usunąć ten kurs? Tej operacji nie można cofnąć, a wszystkie powiązane lekcje i wyniki egzaminów zostaną skasowane."
       />
     </>
   )

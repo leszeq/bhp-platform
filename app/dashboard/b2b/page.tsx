@@ -109,6 +109,12 @@ export default async function B2BDashboard() {
   const pending = total - done
   const progressPercent = total > 0 ? Math.round((done / total) * 100) : 0
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
   return (
     <div className="p-6 md:p-10 max-w-4xl mx-auto min-h-screen">
       
@@ -135,11 +141,21 @@ export default async function B2BDashboard() {
           </div>
         </div>
 
-        <form action={signOut}>
-           <button className="text-sm font-semibold text-gray-500 hover:text-red-600 transition border border-gray-200 px-4 py-2 rounded-lg bg-white shadow-sm hover:border-red-200">
-             Wyloguj konto
-           </button>
-        </form>
+        <div className="flex items-center gap-4">
+          {profile?.role === 'admin' && (
+            <Link 
+              href="/admin"
+              className="text-sm font-bold text-indigo-600 hover:text-indigo-700 border border-indigo-100 rounded-xl px-4 py-2 bg-indigo-50 hover:bg-indigo-100 transition shadow-sm"
+            >
+              Panel Admina
+            </Link>
+          )}
+          <form action={signOut}>
+             <button className="text-sm font-semibold text-gray-500 hover:text-red-600 transition border border-gray-200 px-4 py-2 rounded-lg bg-white shadow-sm hover:border-red-200">
+               Wyloguj konto
+             </button>
+          </form>
+        </div>
       </div>
 
       {/* 2. STATS KPI */}
